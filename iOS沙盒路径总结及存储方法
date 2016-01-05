@@ -1,0 +1,144 @@
+###沙盒分组目录清单
+
+####1 Documents
+
+ 用于存储用户生成的文件、其他数据及其他程序不能重新创建的文件，默认文件通过iCloud自动备份。如果不需要iCloud备份，则设置标记
+```
+    注明不备份
+    NSURLIsExcludedFromBackupKey
+    
+    1.1 读取Documents目录代码
+    
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+    
+    NSString *path = [paths objectAtIndex:0];
+    
+    NSLog(@"path:%@", path);
+    //1.2 标记不备份文件
+    
+    + (BOOL)addSkipBackupAttributeToItemAtURL:(NSURL *)URL
+    {
+        assert([[NSFileManager defaultManager] fileExistsAtPath: [URL path]]);
+        
+        NSError *error = nil;
+        BOOL success = [URL setResourceValue: [NSNumber numberWithBool: YES]
+                                      forKey: NSURLIsExcludedFromBackupKey error: &error];
+        if(!success){
+            NSLog(@"Error excluding %@ from backup %@", [URL lastPathComponent], error);
+        }
+        return success;
+    }
+```
+
+####2 Library
+
+存储项目缓存,常用设置等
+```
+2.1 读取Cache目录代码
+
+NSArray *paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);  
+NSString *path = [paths objectAtIndex:0];  
+NSLog(@"%@", path);  
+2.2 读取Library目录
+
+NSArray *paths = NSSearchPathForDirectoriesInDomains(NSLibraryDirectory, NSUserDomainMask, YES);  
+NSString *path = [paths objectAtIndex:0];  
+NSLog(@"%@", path);  
+```
+
+####3 temp
+
+只是临时使用的数据应该保存到 <Application_Home>/tmp 文件夹。尽管 iCloud 不会备份这些文件，但在应用在使用完这些数据之后要注意随时删除，避免占用用户设备的空间
+
+ 
+```
+3.1读取temp文件夹
+
+NSString *tmpDir = NSTemporaryDirectory();  
+ NSLog(@"%@", tmpDir);
+```
+
+####4 项目自带的.bundle资源束
+```
+项目自带的资源存放在.bundle中这些资源只读不能写
+
+  NSString *defaultDBPath = [[NSBundlemainBundle] resourcePath];
+```
+
+###存储方法
+####plist文件存储
+获取沙河路径:
+NSString *Path = NSHomeDirectory();
+
+获取 Documents 的路径
+在某个范围搜索某个文件夹的路径
+```
+//参数介绍:
+1. directory   表示获取哪个文件夹目录
+2. domainMask  表示查找范围(NSUserDomainMask 表示在用户手机上查找)
+3. rxpandTitle 表示是否展开波浪号
+NSString *docPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+
+//拼接文件路径
+NSString *filePath = [docPath stringByAppendingPathComponent:@"array.plist"];
+
+//存储到plist文件
+[数组/字典/基本数据类型对象 writeToFile:filePath atomically:YES];
+
+//读取:
+//调用对应的方法进行读取 例如数组:
+NSArray *array = [NSArray arrayWithContentsOfFile:filePath];
+```
+
+####偏好设置存储
+
+[NSUserDefaults standardUserDefaults] 是专门用来做偏好设置存储的
+快速做一些简单的键值对的存储, 底层的封装方式: 就是包装了一个字典
+不需要关心文件名
+```
+//iOS8之前, 通常还需要做一个同步操作, 就是把缓存数据同步到硬盘当中
+[[NSUserDefaults standardUserDefaults] setObject:存储对象 forKey:@"键值"];
+
+//iOS8之前, 一定做一个同步操作, 及时把缓存数据同步到硬盘当中
+[[NSUserDefaults standardUserDefaults] synchronize];
+
+//读取:
+ NSString *account = [[NSUserDefaults standardUserDefaults] objectForKey:@"键值"];
+```
+
+####归档存储
+存储在MARK:中可以存储自定义对象
+```
+//获取文件全路径
+//路径一定要展开, file 必须是全路径
+NSString *cachePath = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES)[0];
+
+//拼接文件名
+NSString *filePath = [cachePath stringByAppendingPathComponent:@"person.data"];
+
+//归档
+//对象要归档, 一定要遵守 <NSCoding> 协议, 而且要实现 encodeWithCoder 方法
+[NSKeyedArchiver archiveRootObject:p toFile:filePath];
+
+//读取:
+Person *p = [NSKeyedUnarchiver unarchiveObjectWithFile:filePath];
+
+//将对象归档和解档时必须写这两个方法 告诉对象哪些属性需要归档 和解档
+//归档:对象归档的时候调用(当将一个自定义对象保存到文件的时候就会调用)
+- (void)encodeWithCoder:(NSCoder *)aCoder {
+[aCoder encodeObject:_name forKey:NameKey];
+[aCoder encodeInteger:_age forKey:AgeKey];
+}
+//解档:对象解档的时候调用(当从文件中读取一个对象的时候就会调用该方法)
+
+- (instancetype)initWithCoder:(NSCoder *)aDecoder {
+super -> NSObject 没有遵守 NSCoding 协议
+//如果父类没有遵守 NSCoding 协议, 就不需要调用 initWithCoder 方法
+if (self = [super init]) {
+//一定不能忘记赋值
+_name = [aDecoder decodeObjectForKey:NameKey];
+_age = [aDecoder decodeIntForKey:AgeKey];
+}
+return self;
+}
+```
